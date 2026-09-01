@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/svg+xml" href="./img/logo-icon.svg">
+  <title>Planificador de Rutas Gc17</title>
+</head>
+<body>
+<div class="rp-root">
+  <div class="rp-header">
+    <div>
+      <img src="./img/logo-horizontal.svg" class="rp-logo" alt="Logo Gc17">
+      <div class="rp-subtitle">Cargá tus paquetes, salí con el orden más corto — Buenos Aires, en auto</div>
+    </div>
+  </div>
+
+  <div class="rp-grid">
+    <div class="rp-panel">
+      <div class="rp-section-label">1. Cargar direcciones</div>
+      <div class="rp-dropzone" id="rp-dropzone">
+        <p><strong>Subí tu Excel o CSV</strong></p>
+        <p>Una dirección por fila, primera columna. Click o arrastrá el archivo acá.</p>
+        <input type="file" id="rp-file-input" class="rp-file-input" accept=".xlsx,.xls,.csv">
+      </div>
+      <div class="rp-hint">Si la ciudad/partido no está en la dirección, se asume Buenos Aires, Argentina para geocodificar mejor.</div>
+
+      <label class="rp-geo-option">
+        <input type="checkbox" id="rp-use-location">
+        Empezar la ruta desde mi ubicación actual
+      </label>
+
+      <ul class="rp-stop-list" id="rp-stop-list"></ul>
+
+      <button class="rp-btn" id="rp-optimize-btn" disabled>Cargá direcciones primero</button>
+      <button class="rp-btn-mini" id="rp-reset-btn" style="margin-top:8px;width:100%;padding:8px;">Empezar de nuevo (borra lo guardado)</button>
+      <div class="rp-error-banner" id="rp-error-banner"></div>
+
+      <div class="rp-results" id="rp-results">
+        <div class="rp-section-label">2. Ruta optimizada</div>
+        <div class="rp-stats">
+          <div class="rp-stat"><b id="rp-stat-dist">–</b><span>distancia total</span></div>
+          <div class="rp-stat"><b id="rp-stat-time">–</b><span>tiempo estimado</span></div>
+        </div>
+        <div class="rp-hint" style="margin:-2px 0 8px;">Arrastrá una parada si ves que conviene otro orden — recalcula la ruta real con tu cambio.</div>
+        <ul class="rp-order-list" id="rp-order-list"></ul>
+
+        <div id="rp-delivered-wrap" style="display:none;">
+          <div class="rp-section-label">Entregados <span id="rp-delivered-count"></span></div>
+          <ul class="rp-order-list" id="rp-delivered-list"></ul>
+        </div>
+        <div class="rp-section-label" style="margin-top:4px;">Navegar</div>
+        <div class="rp-nav-links" id="rp-nav-links"></div>
+      </div>
+    </div>
+
+    <div class="rp-map-wrap">
+      <div id="rp-map"></div>
+      <div class="rp-map-empty" id="rp-map-empty">El mapa y la ruta optimizada van a aparecer acá una vez que cargues las direcciones.</div>
+    </div>
+  </div>
+</div>
+<script src="script.js"></script>
+</body>
+</html>
+
+

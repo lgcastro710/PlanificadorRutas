@@ -1,0 +1,26 @@
+<svg viewBox="0 0 560 160" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="rp-clip-h">
+      <rect x="0" y="0" width="160" height="160" rx="36" ry="36"/>
+    </clipPath>
+  </defs>
+
+  <!-- icono -->
+  <rect x="0" y="0" width="160" height="160" rx="36" ry="36" fill="#1b1f24"/>
+  <g clip-path="url(#rp-clip-h)">
+    <path d="M25,131 C47,105 37,79 64,71 C91,63 82,39 112,33"
+          fill="none" stroke="#1f5c4f" stroke-width="8"
+          stroke-linecap="round" stroke-dasharray="1 15"/>
+    <circle cx="25" cy="131" r="8" fill="#e0a327"/>
+    <circle cx="64" cy="71" r="8" fill="#e0a327"/>
+    <g transform="translate(112,33) scale(0.68)">
+      <path d="M0,-38 C22,-38 38,-22 38,0 C38,28 0,58 0,58 C0,58 -38,28 -38,0 C-38,-22 -22,-38 0,-38 Z"
+            fill="#c4432b"/>
+      <circle cx="0" cy="0" r="15" fill="#fbfaf7"/>
+    </g>
+  </g>
+
+  <!-- wordmark -->
+  <text x="188" y="98" font-family="'Space Grotesk', Arial, sans-serif" font-size="54" font-weight="700" fill="#1b1f24">Ruta<tspan fill="#c4432b">Optima</tspan></text>
+  <text x="190" y="126" font-family="Arial, sans-serif" font-size="16" fill="#565c64">Entregá más rápido, sin vueltas</text>
+</svg>
