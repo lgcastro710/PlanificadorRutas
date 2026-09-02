@@ -27,6 +27,7 @@
   const scanResult = document.getElementById('rp-scan-result');
   const scanDetectedLabel = document.getElementById('rp-scan-detected-label');
   const scanEditInput = document.getElementById('rp-scan-edit');
+  const scanRawText = document.getElementById('rp-scan-raw-text');
   const scanConfirmBtn = document.getElementById('rp-scan-confirm-btn');
   const scanRetryBtn = document.getElementById('rp-scan-retry-btn');
 
@@ -818,6 +819,7 @@
       scanOcrLoading.style.display = 'none';
       scanResult.style.display = 'flex';
       scanEditInput.value = result.address;
+      scanRawText.value = data.text || '(vacío)';
       scanDetectedLabel.textContent = result.found
         ? '📍 Dirección detectada'
         : '🤔 No pude reconocer el patrón — revisá/completá a mano';
@@ -828,6 +830,7 @@
       scanOcrLoading.style.display = 'none';
       scanResult.style.display = 'flex';
       scanEditInput.value = '';
+      scanRawText.value = '(no se pudo leer nada — error de OCR)';
       scanDetectedLabel.textContent = '⚠️ Falló la lectura automática — escribí la dirección a mano';
       showError('Detalle técnico del error de OCR: ' + (e && e.message ? e.message : e));
       scanEditInput.focus();

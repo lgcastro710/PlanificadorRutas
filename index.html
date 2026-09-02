@@ -45,6 +45,10 @@
             <div id="rp-scan-result" class="rp-scan-result" style="display:none;">
               <div class="rp-scan-detected" id="rp-scan-detected-label">📍 Dirección detectada</div>
               <input type="text" id="rp-scan-edit" class="rp-scan-edit-input" placeholder="Editá la dirección si hace falta...">
+              <details class="rp-scan-raw-details">
+                <summary>Ver texto crudo que leyó el OCR</summary>
+                <textarea id="rp-scan-raw-text" class="rp-scan-raw-text" readonly rows="5"></textarea>
+              </details>
               <div class="rp-scan-controls">
                 <button class="rp-btn" id="rp-scan-confirm-btn">✓ Agregar</button>
                 <button class="rp-btn-mini" id="rp-scan-retry-btn">Volver a escanear</button>
