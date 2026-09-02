@@ -11,7 +11,41 @@
   const errorBanner = document.getElementById('rp-error-banner');
   const resultsEl = document.getElementById('rp-results');
   const mapEmpty = document.getElementById('rp-map-empty');
+  const mapLoading = document.getElementById('rp-map-loading');
+  const mapLoadingText = document.getElementById('rp-map-loading-text');
+  let mapLoadingShownAt = 0;
   const useLocationCheckbox = document.getElementById('rp-use-location');
+
+  const scanOpenBtn = document.getElementById('rp-scan-open-btn');
+  const scanPanel = document.getElementById('rp-scan-panel');
+  const scanVideo = document.getElementById('rp-scan-video');
+  const scanCanvas = document.getElementById('rp-scan-canvas');
+  const scanLiveControls = document.getElementById('rp-scan-live-controls');
+  const scanCaptureBtn = document.getElementById('rp-scan-capture-btn');
+  const scanCancelBtn = document.getElementById('rp-scan-cancel-btn');
+  const scanOcrLoading = document.getElementById('rp-scan-ocr-loading');
+  const scanResult = document.getElementById('rp-scan-result');
+  const scanDetectedLabel = document.getElementById('rp-scan-detected-label');
+  const scanEditInput = document.getElementById('rp-scan-edit');
+  const scanConfirmBtn = document.getElementById('rp-scan-confirm-btn');
+  const scanRetryBtn = document.getElementById('rp-scan-retry-btn');
+
+  function showMapLoading(text){
+    mapLoadingText.textContent = text || 'Calculando la mejor ruta...';
+    mapLoading.classList.add('show');
+    mapLoadingShownAt = Date.now();
+  }
+  function hideMapLoading(){
+    const MIN_VISIBLE_MS = 800;
+    const elapsed = Date.now() - mapLoadingShownAt;
+    const wait = Math.max(0, MIN_VISIBLE_MS - elapsed);
+    return new Promise(resolve => {
+      setTimeout(() => {
+        mapLoading.classList.remove('show');
+        resolve();
+      }, wait);
+    });
+  }
 
   function saveState(){
     try {
@@ -60,9 +94,12 @@
     stopListEl.innerHTML = '';
     resultsEl.classList.remove('show');
     clearError();
+    hideMapLoading();
     if (state.layerGroup) state.layerGroup.clearLayers();
     mapEmpty.style.display = 'flex';
     mapEmpty.textContent = MAP_EMPTY_DEFAULT_TEXT;
+    document.getElementById('rp-details-upload').setAttribute('open', '');
+    document.getElementById('rp-details-nav').removeAttribute('open');
     renderDeliveredList();
     checkReady();
   });
@@ -109,19 +146,25 @@
           showError('No encontré direcciones en la primera columna del archivo.');
           return;
         }
-        if (addresses.length > 30) {
-          showError('Encontré ' + addresses.length + ' direcciones. Funciona mejor con hasta 30 por tanda — el resto se ignora por ahora.');
-          addresses = addresses.slice(0, 30);
+        const spaceLeft = 80 - state.stops.length;
+        if (spaceLeft <= 0) {
+          showError('Ya tenés 80 direcciones cargadas, el máximo por tanda. Optimizá o empezá de nuevo antes de sumar más.');
+          return;
+        }
+        if (addresses.length > spaceLeft) {
+          showError('Encontré ' + addresses.length + ' direcciones pero solo entran ' + spaceLeft + ' más (tope de 80 por tanda) — el resto se ignora por ahora.');
+          addresses = addresses.slice(0, spaceLeft);
         }
 
-        state.stops = addresses.map((addr, i) => ({
-          id: 'stop-' + i,
+        const newStops = addresses.map((addr, i) => ({
+          id: 'stop-xlsx-' + Date.now() + '-' + i,
           raw: addr,
           lat: null, lon: null,
           status: 'pending'
         }));
+        state.stops = state.stops.concat(newStops);
         renderStopList();
-        geocodeAll();
+        geocodeAll(newStops);
       } catch (err) {
         showError('No pude leer el archivo. Probá exportarlo como .xlsx o .csv simple.');
       }
@@ -196,13 +239,21 @@
     }
   }
 
-  async function geocodeAll(){
+  async function geocodeAll(stopsToGeocode){
+    const list = stopsToGeocode || state.stops.filter(s => s.status === 'pending');
     optimizeBtn.disabled = true;
-    optimizeBtn.textContent = 'Ubicando direcciones...';
-    for (const stop of state.stops) {
+    const total = list.length;
+    let done = 0;
+    for (const stop of list) {
+      const remaining = total - done;
+      const secsLeft = Math.round(remaining * 1.1);
+      optimizeBtn.textContent = 'Ubicando ' + (done + 1) + '/' + total + '... (~' + secsLeft + 's)';
       await geocodeOne(stop);
+      done++;
       renderStopList();
-      await new Promise(r => setTimeout(r, 1100)); // respetar límite de Nominatim (1 req/seg)
+      if (done < total) {
+        await new Promise(r => setTimeout(r, 1100)); // respetar límite de Nominatim (1 req/seg)
+      }
     }
     checkReady();
     saveState();
@@ -217,6 +268,87 @@
       optimizeBtn.disabled = true;
       optimizeBtn.textContent = 'Necesito al menos 2 direcciones ubicadas';
     }
+  }
+
+  // Cola separada para geocodificar direcciones agregadas de a una (por escaneo),
+  // respetando igual el límite de 1 req/seg de Nominatim sin pisar una carga masiva de Excel en curso.
+  let scanGeocodeChain = Promise.resolve();
+  function addStopFromScan(rawAddress){
+    const clean = rawAddress.trim();
+    if (!clean) return;
+    const stop = {
+      id: 'stop-scan-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+      raw: clean,
+      lat: null, lon: null,
+      status: 'pending'
+    };
+    state.stops.push(stop);
+    renderStopList();
+    checkReady();
+
+    scanGeocodeChain = scanGeocodeChain.then(async () => {
+      await geocodeOne(stop);
+      renderStopList();
+      checkReady();
+      saveState();
+      await new Promise(r => setTimeout(r, 1100));
+    });
+  }
+
+  async function fetchDurationMatrix(points){
+    const coordStr = points.map(p => p.lon + ',' + p.lat).join(';');
+    const url = 'https://router.project-osrm.org/table/v1/driving/' + coordStr + '?annotations=duration';
+    const res = await fetch(url);
+    const json = await res.json();
+    if (json.code !== 'Ok' || !json.durations) throw new Error('table service failed');
+    return json.durations;
+  }
+
+  // Arma un primer orden razonable: en cada paso salta al punto no visitado más cercano en tiempo.
+  function nearestNeighborOrder(matrix, startIdx, n){
+    const visited = new Array(n).fill(false);
+    const order = [startIdx];
+    visited[startIdx] = true;
+    let current = startIdx;
+    for (let step = 1; step < n; step++) {
+      let best = -1, bestTime = Infinity;
+      for (let j = 0; j < n; j++) {
+        if (!visited[j] && matrix[current][j] != null && matrix[current][j] < bestTime) {
+          bestTime = matrix[current][j];
+          best = j;
+        }
+      }
+      if (best === -1) { for (let j = 0; j < n; j++) { if (!visited[j]) { best = j; break; } } }
+      order.push(best);
+      visited[best] = true;
+      current = best;
+    }
+    return order;
+  }
+
+  // Mejora el orden probando invertir tramos si eso reduce el tiempo total (2-opt), con límite de tiempo para no colgar el navegador.
+  function twoOptImprove(matrix, order, maxMs){
+    const start = Date.now();
+    const n = order.length;
+    const time = (a, b) => matrix[a][b] == null ? 0 : matrix[a][b];
+    let improved = true;
+    while (improved && (Date.now() - start) < maxMs) {
+      improved = false;
+      for (let i = 1; i < n - 2; i++) {
+        for (let k = i + 1; k < n - 1; k++) {
+          const a = order[i - 1], b = order[i], c = order[k], d = order[k + 1];
+          const before = time(a, b) + time(c, d);
+          const after = time(a, c) + time(b, d);
+          if (after < before - 0.5) {
+            let lo = i, hi = k;
+            while (lo < hi) { const tmp = order[lo]; order[lo] = order[hi]; order[hi] = tmp; lo++; hi--; }
+            improved = true;
+          }
+        }
+        if ((Date.now() - start) >= maxMs) break;
+      }
+    }
+    return order;
   }
 
   function getUserLocation(){
@@ -234,41 +366,28 @@
     clearError();
     optimizeBtn.disabled = true;
     optimizeBtn.textContent = 'Calculando la mejor ruta...';
+    showMapLoading('Calculando la mejor ruta...');
 
     const userLoc = await getUserLocation();
     const okStops = state.stops.filter(s => s.status === 'ok');
     const points = userLoc ? [{ lat: userLoc.lat, lon: userLoc.lon, raw: 'Tu ubicación actual', isStart: true }, ...okStops] : okStops;
 
-    const coordStr = points.map(p => p.lon + ',' + p.lat).join(';');
-    const url = 'https://router.project-osrm.org/trip/v1/driving/' + coordStr +
-      '?source=first&roundtrip=false&overview=full&geometries=geojson';
-
     try {
-      const res = await fetch(url);
-      const json = await res.json();
-      if (json.code !== 'Ok' || !json.trips || !json.trips.length) {
-        showError('No pude calcular la ruta óptima. Probá de nuevo en unos segundos.');
-        optimizeBtn.disabled = false;
-        optimizeBtn.textContent = 'Reintentar optimización';
-        return;
-      }
-      const trip = json.trips[0];
-      const ordered = json.waypoints
-        .map((wp, i) => ({ point: points[i], order: wp.waypoint_index }))
-        .sort((a, b) => a.order - b.order)
-        .map(x => x.point);
+      const matrix = await fetchDurationMatrix(points);
+      let orderIdx = nearestNeighborOrder(matrix, 0, points.length);
+      orderIdx = twoOptImprove(matrix, orderIdx, 1800);
+      const ordered = orderIdx.map(i => points[i]);
 
-      state.order = ordered;
-      state.trip = trip;
-      renderResults(trip, ordered);
-      renderMap(trip, ordered);
-      optimizeBtn.disabled = false;
+      await recomputeRouteForOrder(ordered);
       optimizeBtn.textContent = 'Recalcular ruta';
-      saveState();
+      document.getElementById('rp-details-upload').removeAttribute('open');
+      document.getElementById('rp-details-route').setAttribute('open', '');
     } catch (e) {
-      showError('Falló la conexión con el servicio de rutas. Probá de nuevo.');
-      optimizeBtn.disabled = false;
+      showError('No pude calcular la ruta óptima. Probá de nuevo en unos segundos.');
       optimizeBtn.textContent = 'Reintentar optimización';
+      await hideMapLoading();
+    } finally {
+      optimizeBtn.disabled = false;
     }
   });
 
@@ -322,6 +441,7 @@
 
   async function recomputeRouteForOrder(order){
     clearError();
+    showMapLoading('Recalculando ruta...');
     try {
       const coordStr = order.map(p => p.lon + ',' + p.lat).join(';');
       const url = 'https://router.project-osrm.org/route/v1/driving/' + coordStr + '?overview=full&geometries=geojson';
@@ -339,6 +459,8 @@
       saveState();
     } catch (e) {
       showError('Falló la conexión al recalcular. Probá de nuevo.');
+    } finally {
+      await hideMapLoading();
     }
   }
 
@@ -487,7 +609,7 @@
     const startPoint = ordered.find(p => p.isStart) || ordered[0];
     const restStart = ordered[0].isStart ? 1 : 1;
 
-    const chunkSize = 23; // límite práctico de waypoints en el link de Google Maps
+    const chunkSize = 9; // cada tramo = origen + 8 paradas intermedias + destino = 10 puntos totales por link (el máximo que acepta Google Maps)
     let idx = 0;
     let leg = 1;
     while (idx < ordered.length - 1) {
@@ -554,6 +676,144 @@
       state.map.fitBounds(bounds, { padding: [24, 24] });
     }
   }
+
+  // ===================== ESCANEAR PAQUETE (cámara + OCR) =====================
+
+  const STREET_PREFIXES = [
+    'avenida', 'av\\.?', 'calle', 'pasaje', 'pje\\.?', 'boulevard', 'bv\\.?',
+    'ruta', 'autopista', 'diagonal', 'diag\\.?', 'bulevar'
+  ];
+  const STREET_REGEX = new RegExp(
+    '(' + STREET_PREFIXES.join('|') + ')\\s+([a-záéíóúñü0-9°ª\'\\.\\s]{2,40}?)\\s*n?°?\\s*(\\d{1,6})',
+    'i'
+  );
+
+  const KNOWN_LOCALITIES = [
+    'CABA', 'Ciudad Autónoma de Buenos Aires', 'Capital Federal', 'Buenos Aires',
+    'Vicente López', 'San Isidro', 'San Martín', 'San Fernando', 'Tigre', 'Escobar',
+    'Pilar', 'Malvinas Argentinas', 'José C. Paz', 'San Miguel', 'Moreno', 'Merlo',
+    'Morón', 'Ituzaingó', 'Hurlingham', 'Tres de Febrero', 'La Matanza', 'Ezeiza',
+    'Esteban Echeverría', 'Almirante Brown', 'Lanús', 'Lomas de Zamora', 'Avellaneda',
+    'Quilmes', 'Berazategui', 'Florencio Varela', 'San Vicente', 'La Plata',
+    'Ensenada', 'Berisso'
+  ];
+
+  let ocrWorkerPromise = null;
+  let cameraStream = null;
+
+  function getOcrWorker(){
+    if (!ocrWorkerPromise) {
+      ocrWorkerPromise = Tesseract.createWorker('spa');
+    }
+    return ocrWorkerPromise;
+  }
+
+  async function openScanPanel(){
+    clearError();
+    scanPanel.style.display = 'block';
+    scanLiveControls.style.display = 'flex';
+    scanResult.style.display = 'none';
+    scanOcrLoading.style.display = 'none';
+    scanVideo.style.display = 'block';
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false
+      });
+      scanVideo.srcObject = cameraStream;
+    } catch (e) {
+      showError('No pude acceder a la cámara. Revisá los permisos del navegador para este sitio.');
+      closeScanPanel();
+    }
+  }
+
+  function closeScanPanel(){
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(t => t.stop());
+      cameraStream = null;
+    }
+    scanPanel.style.display = 'none';
+  }
+
+  function normalizeForMatch(text){
+    return text.replace(/\r/g, '').replace(/[ \t]+/g, ' ');
+  }
+
+  function detectAddressFromText(rawText){
+    const text = normalizeForMatch(rawText);
+    const flat = text.replace(/\n/g, ' ');
+
+    let streetPart = null;
+    const m = flat.match(STREET_REGEX);
+    if (m) {
+      const prefix = m[1].replace(/\.$/, '');
+      const streetName = m[2].trim().replace(/\s{2,}/g, ' ');
+      const number = m[3];
+      streetPart = prefix.charAt(0).toUpperCase() + prefix.slice(1) + ' ' + streetName + ' ' + number;
+    }
+
+    let locality = null;
+    for (const loc of KNOWN_LOCALITIES) {
+      const re = new RegExp('\\b' + loc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+      if (re.test(flat)) { locality = loc; break; }
+    }
+
+    if (streetPart) {
+      return { found: true, address: streetPart + (locality ? ', ' + locality : '') };
+    }
+    // No matcheó el patrón de calle+número: devolvemos el texto crudo para que lo edite a mano
+    return { found: false, address: flat.trim().slice(0, 120) };
+  }
+
+  async function captureAndReadLabel(){
+    scanLiveControls.style.display = 'none';
+    scanVideo.style.display = 'none';
+    scanOcrLoading.style.display = 'flex';
+
+    scanCanvas.width = scanVideo.videoWidth;
+    scanCanvas.height = scanVideo.videoHeight;
+    const ctx = scanCanvas.getContext('2d');
+    ctx.drawImage(scanVideo, 0, 0, scanCanvas.width, scanCanvas.height);
+
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(t => t.stop());
+      cameraStream = null;
+    }
+
+    try {
+      const worker = await getOcrWorker();
+      const { data } = await worker.recognize(scanCanvas);
+      const result = detectAddressFromText(data.text || '');
+      scanOcrLoading.style.display = 'none';
+      scanResult.style.display = 'flex';
+      scanEditInput.value = result.address;
+      scanDetectedLabel.textContent = result.found
+        ? '📍 Dirección detectada'
+        : '🤔 No pude reconocer el patrón — revisá/completá a mano';
+      scanEditInput.focus();
+    } catch (e) {
+      scanOcrLoading.style.display = 'none';
+      showError('Falló la lectura de la etiqueta. Probá con más luz o más cerca del texto.');
+      closeScanPanel();
+    }
+  }
+
+  scanOpenBtn.addEventListener('click', openScanPanel);
+  scanCancelBtn.addEventListener('click', closeScanPanel);
+  scanCaptureBtn.addEventListener('click', captureAndReadLabel);
+
+  scanRetryBtn.addEventListener('click', () => {
+    scanResult.style.display = 'none';
+    openScanPanel();
+  });
+
+  scanConfirmBtn.addEventListener('click', () => {
+    const addr = scanEditInput.value.trim();
+    if (!addr) return;
+    addStopFromScan(addr);
+    scanResult.style.display = 'none';
+    openScanPanel(); // vuelve a la cámara para escanear el próximo paquete
+  });
 
   loadState();
 })();

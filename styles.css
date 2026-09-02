@@ -1,6 +1,4 @@
-
-
-  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
 
   :root{
     --bg: #f3f2ee;
@@ -36,10 +34,10 @@
     margin-bottom: 16px;
     flex-wrap: wrap;
   }
-  .rp-logo{
-    width: 160px;
+ .rp-logo{
+  width: 32px; height: 32px;
+ }
 
-  }
   .rp-grid{
     display: grid;
     grid-template-columns: 360px 1fr;
@@ -268,6 +266,75 @@
   }
   .rp-error-banner.show{ display: block; }
 
+  .rp-collapsible{
+    border: none;
+    margin-bottom: 6px;
+  }
+  .rp-collapsible summary{
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+  }
+  .rp-collapsible summary::-webkit-details-marker{ display: none; }
+  .rp-collapsible summary::after{
+    content: '▾';
+    font-size: 11px;
+    color: var(--ink-soft);
+    transition: transform .15s;
+    margin-left: 8px;
+  }
+  .rp-collapsible[open] summary::after{ transform: rotate(180deg); }
+  .rp-collapsible-body{ padding-top: 4px; }
+
+  .rp-map-loading{
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: var(--bg);
+    z-index: 5;
+  }
+  .rp-map-loading.show{ display: flex; }
+  .rp-road{
+    position: relative;
+    width: 240px;
+    height: 56px;
+    overflow: hidden;
+  }
+  .rp-road::before{
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 4px;
+    transform: translateY(-50%);
+    background: repeating-linear-gradient(90deg, var(--amber) 0 14px, transparent 14px 30px);
+    animation: rp-road-move .5s linear infinite;
+  }
+  @keyframes rp-road-move{ 0%{ background-position: 0 0; } 100%{ background-position: -44px 0; } }
+  .rp-car{
+    position: absolute;
+    bottom: 4px;
+    width: 58px;
+    left: -70px;
+    animation: rp-drive 1.15s linear infinite;
+  }
+  @keyframes rp-drive{
+    0%{ left: -70px; }
+    100%{ left: 240px; }
+  }
+  #rp-map-loading-text{
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin: 0;
+  }
   .rp-marker-num{
     background: var(--brick);
     color: #fff;
@@ -280,3 +347,103 @@
     border: 2px solid #fff;
     box-shadow: 0 1px 4px rgba(0,0,0,.35);
   }
+.rp-add-title{
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  font-size: 13.5px;
+  margin-bottom: 10px;
+}
+
+.rp-scan-open-btn{
+  margin-top: 0;
+  background: var(--pine);
+}
+.rp-scan-open-btn:hover{ background: #163f36; }
+
+.rp-or-divider{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+.rp-or-divider::before, .rp-or-divider::after{
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.rp-scan-panel{
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: #fff;
+}
+
+.rp-scan-video{
+  width: 100%;
+  border-radius: 8px;
+  background: #000;
+  display: block;
+  max-height: 280px;
+  object-fit: cover;
+}
+
+.rp-scan-controls{
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.rp-scan-controls .rp-btn{ margin-top: 0; }
+.rp-scan-controls .rp-btn-mini{ flex-shrink: 0; }
+
+.rp-scan-ocr-loading{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 0;
+}
+.rp-scan-ocr-loading p{
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.rp-scan-line{
+  width: 200px;
+  height: 3px;
+  background: var(--border);
+  position: relative;
+  overflow: hidden;
+  border-radius: 2px;
+}
+.rp-scan-line::after{
+  content: '';
+  position: absolute;
+  top: 0; left: -60px;
+  width: 60px; height: 100%;
+  background: linear-gradient(90deg, transparent, var(--brick), transparent);
+  animation: rp-scan-sweep 1s linear infinite;
+}
+@keyframes rp-scan-sweep{
+  0%{ left: -60px; }
+  100%{ left: 200px; }
+}
+
+.rp-scan-result{ display: flex; flex-direction: column; }
+.rp-scan-detected{
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.rp-scan-edit-input{
+  font-family: inherit;
+  font-size: 13.5px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 100%;
+}

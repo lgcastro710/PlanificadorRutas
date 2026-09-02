@@ -14,53 +14,112 @@
 <div class="rp-root">
   <div class="rp-header">
     <div>
-      <img src="./img/logo-horizontal.svg" class="rp-logo" alt="Logo Gc17">
+      <img src="./img/logo-horizontal.svg" alt="Logo" class="rp-logo">
       <div class="rp-subtitle">Cargá tus paquetes, salí con el orden más corto — Buenos Aires, en auto</div>
     </div>
   </div>
-
+ 
   <div class="rp-grid">
     <div class="rp-panel">
-      <div class="rp-section-label">1. Cargar direcciones</div>
-      <div class="rp-dropzone" id="rp-dropzone">
-        <p><strong>Subí tu Excel o CSV</strong></p>
-        <p>Una dirección por fila, primera columna. Click o arrastrá el archivo acá.</p>
-        <input type="file" id="rp-file-input" class="rp-file-input" accept=".xlsx,.xls,.csv">
-      </div>
-      <div class="rp-hint">Si la ciudad/partido no está en la dirección, se asume Buenos Aires, Argentina para geocodificar mejor.</div>
-
-      <label class="rp-geo-option">
-        <input type="checkbox" id="rp-use-location">
-        Empezar la ruta desde mi ubicación actual
-      </label>
-
-      <ul class="rp-stop-list" id="rp-stop-list"></ul>
-
-      <button class="rp-btn" id="rp-optimize-btn" disabled>Cargá direcciones primero</button>
-      <button class="rp-btn-mini" id="rp-reset-btn" style="margin-top:8px;width:100%;padding:8px;">Empezar de nuevo (borra lo guardado)</button>
-      <div class="rp-error-banner" id="rp-error-banner"></div>
-
+      <details class="rp-collapsible" id="rp-details-upload" open>
+        <summary class="rp-section-label">1. Cargar direcciones</summary>
+        <div class="rp-collapsible-body">
+          <div class="rp-add-title">📦 Agregar paquetes</div>
+ 
+          <button class="rp-btn rp-scan-open-btn" id="rp-scan-open-btn">📷 Escanear paquete</button>
+ 
+          <div id="rp-scan-panel" class="rp-scan-panel" style="display:none;">
+            <video id="rp-scan-video" class="rp-scan-video" autoplay playsinline muted></video>
+            <canvas id="rp-scan-canvas" style="display:none;"></canvas>
+ 
+            <div id="rp-scan-live-controls" class="rp-scan-controls">
+              <button class="rp-btn" id="rp-scan-capture-btn">📸 Capturar etiqueta</button>
+              <button class="rp-btn-mini" id="rp-scan-cancel-btn">Cancelar</button>
+            </div>
+ 
+            <div id="rp-scan-ocr-loading" class="rp-scan-ocr-loading" style="display:none;">
+              <div class="rp-scan-line"></div>
+              <p>Leyendo etiqueta...</p>
+            </div>
+ 
+            <div id="rp-scan-result" class="rp-scan-result" style="display:none;">
+              <div class="rp-scan-detected" id="rp-scan-detected-label">📍 Dirección detectada</div>
+              <input type="text" id="rp-scan-edit" class="rp-scan-edit-input" placeholder="Editá la dirección si hace falta...">
+              <div class="rp-scan-controls">
+                <button class="rp-btn" id="rp-scan-confirm-btn">✓ Agregar</button>
+                <button class="rp-btn-mini" id="rp-scan-retry-btn">Volver a escanear</button>
+              </div>
+            </div>
+          </div>
+ 
+          <div class="rp-or-divider"><span>o</span></div>
+ 
+          <div class="rp-dropzone" id="rp-dropzone">
+            <p><strong>Subí tu Excel o CSV</strong></p>
+            <p>Una dirección por fila, primera columna. Click o arrastrá el archivo acá.</p>
+            <input type="file" id="rp-file-input" class="rp-file-input" accept=".xlsx,.xls,.csv">
+          </div>
+          <div class="rp-hint">Si la ciudad/partido no está en la dirección, se asume Buenos Aires, Argentina para geocodificar mejor.</div>
+ 
+          <label class="rp-geo-option">
+            <input type="checkbox" id="rp-use-location">
+            Empezar la ruta desde mi ubicación actual
+          </label>
+ 
+          <ul class="rp-stop-list" id="rp-stop-list"></ul>
+ 
+          <button class="rp-btn" id="rp-optimize-btn" disabled>Cargá direcciones primero</button>
+          <button class="rp-btn-mini" id="rp-reset-btn" style="margin-top:8px;width:100%;padding:8px;">Empezar de nuevo (borra lo guardado)</button>
+          <div class="rp-error-banner" id="rp-error-banner"></div>
+        </div>
+      </details>
+ 
       <div class="rp-results" id="rp-results">
-        <div class="rp-section-label">2. Ruta optimizada</div>
-        <div class="rp-stats">
-          <div class="rp-stat"><b id="rp-stat-dist">–</b><span>distancia total</span></div>
-          <div class="rp-stat"><b id="rp-stat-time">–</b><span>tiempo estimado</span></div>
-        </div>
-        <div class="rp-hint" style="margin:-2px 0 8px;">Arrastrá una parada si ves que conviene otro orden — recalcula la ruta real con tu cambio.</div>
-        <ul class="rp-order-list" id="rp-order-list"></ul>
-
-        <div id="rp-delivered-wrap" style="display:none;">
-          <div class="rp-section-label">Entregados <span id="rp-delivered-count"></span></div>
-          <ul class="rp-order-list" id="rp-delivered-list"></ul>
-        </div>
-        <div class="rp-section-label" style="margin-top:4px;">Navegar</div>
-        <div class="rp-nav-links" id="rp-nav-links"></div>
+        <details class="rp-collapsible" id="rp-details-route" open>
+          <summary class="rp-section-label">2. Ruta optimizada</summary>
+          <div class="rp-collapsible-body">
+            <div class="rp-stats">
+              <div class="rp-stat"><b id="rp-stat-dist">–</b><span>distancia total</span></div>
+              <div class="rp-stat"><b id="rp-stat-time">–</b><span>tiempo estimado</span></div>
+            </div>
+            <div class="rp-hint" style="margin:-2px 0 8px;">Arrastrá una parada si ves que conviene otro orden — recalcula la ruta real con tu cambio.</div>
+            <ul class="rp-order-list" id="rp-order-list"></ul>
+ 
+            <div id="rp-delivered-wrap" style="display:none;">
+              <div class="rp-section-label">Entregados <span id="rp-delivered-count"></span></div>
+              <ul class="rp-order-list" id="rp-delivered-list"></ul>
+            </div>
+          </div>
+        </details>
+ 
+        <details class="rp-collapsible" id="rp-details-nav">
+          <summary class="rp-section-label">Navegar</summary>
+          <div class="rp-collapsible-body">
+            <div class="rp-nav-links" id="rp-nav-links"></div>
+          </div>
+        </details>
       </div>
     </div>
-
+ 
     <div class="rp-map-wrap">
       <div id="rp-map"></div>
       <div class="rp-map-empty" id="rp-map-empty">El mapa y la ruta optimizada van a aparecer acá una vez que cargues las direcciones.</div>
+      <div class="rp-map-loading" id="rp-map-loading">
+        <div class="rp-road">
+          <svg class="rp-car" viewBox="0 0 120 60" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="60" cy="52" rx="46" ry="4" fill="#000" opacity="0.12"/>
+            <rect x="10" y="26" width="90" height="20" rx="9" fill="#c4432b"/>
+            <path d="M28,26 L39,11 L79,11 L91,26 Z" fill="#c4432b"/>
+            <rect x="43" y="15" width="30" height="11" rx="2" fill="#fbfaf7" opacity="0.9"/>
+            <circle cx="34" cy="46" r="9" fill="#1b1f24"/>
+            <circle cx="34" cy="46" r="3.2" fill="#7a7f87"/>
+            <circle cx="82" cy="46" r="9" fill="#1b1f24"/>
+            <circle cx="82" cy="46" r="3.2" fill="#7a7f87"/>
+            <circle cx="99" cy="30" r="2.4" fill="#e0a327"/>
+          </svg>
+        </div>
+        <p id="rp-map-loading-text">Calculando la mejor ruta...</p>
+      </div>
     </div>
   </div>
 </div>
