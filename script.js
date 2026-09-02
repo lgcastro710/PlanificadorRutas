@@ -743,37 +743,68 @@
     const text = normalizeForMatch(rawText);
     const flat = text.replace(/\n/g, ' ');
 
+    // Estrategia 1 (más confiable): las etiquetas de Mercado Libre/Flex/Andreani/Correo
+    // suelen traer un campo explícito "Dirección:" — no depende de que la calle
+    // empiece con "Av./Calle/etc.", que en la mayoría de los casos ni está.
     let streetPart = null;
-    const m = flat.match(STREET_REGEX);
-    if (m) {
-      const prefix = m[1].replace(/\.$/, '');
-      const streetName = m[2].trim().replace(/\s{2,}/g, ' ');
-      const number = m[3];
-      streetPart = prefix.charAt(0).toUpperCase() + prefix.slice(1) + ' ' + streetName + ' ' + number;
+    const dirFieldMatch = text.match(/direcci[oó]n\s*:?\s*([^\n]+)/i);
+    if (dirFieldMatch) {
+      streetPart = dirFieldMatch[1].trim().replace(/\s{2,}/g, ' ');
     }
 
+    // Estrategia 2 (respaldo): buscar prefijo de calle conocido + número.
+    if (!streetPart) {
+      const m = flat.match(STREET_REGEX);
+      if (m) {
+        const prefix = m[1].replace(/\.$/, '');
+        const streetName = m[2].trim().replace(/\s{2,}/g, ' ');
+        const number = m[3];
+        streetPart = prefix.charAt(0).toUpperCase() + prefix.slice(1) + ' ' + streetName + ' ' + number;
+      }
+    }
+
+    // Localidad: primero el campo "Barrio:" si existe, si no, buscar por nombre conocido.
     let locality = null;
-    for (const loc of KNOWN_LOCALITIES) {
-      const re = new RegExp('\\b' + loc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
-      if (re.test(flat)) { locality = loc; break; }
+    const barrioMatch = text.match(/barrio\s*:?\s*([^\n]+)/i);
+    if (barrioMatch) {
+      locality = barrioMatch[1].trim();
+    } else {
+      for (const loc of KNOWN_LOCALITIES) {
+        const re = new RegExp('\\b' + loc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+        if (re.test(flat)) { locality = loc; break; }
+      }
     }
 
     if (streetPart) {
       return { found: true, address: streetPart + (locality ? ', ' + locality : '') };
     }
-    // No matcheó el patrón de calle+número: devolvemos el texto crudo para que lo edite a mano
+    // No matcheó ningún patrón: devolvemos el texto crudo para que lo edite a mano
     return { found: false, address: flat.trim().slice(0, 120) };
   }
 
   async function captureAndReadLabel(){
+    if (!scanVideo.videoWidth) {
+      showError('La cámara todavía no cargó la imagen. Esperá un segundo y volvé a intentar.');
+      return;
+    }
+
     scanLiveControls.style.display = 'none';
     scanVideo.style.display = 'none';
     scanOcrLoading.style.display = 'flex';
 
-    scanCanvas.width = scanVideo.videoWidth;
-    scanCanvas.height = scanVideo.videoHeight;
+    // Redimensionamos: las fotos de celular son enormes y eso hace más lento (o hasta falla) el OCR.
+    const MAX_DIM = 1400;
+    let w = scanVideo.videoWidth;
+    let h = scanVideo.videoHeight;
+    if (Math.max(w, h) > MAX_DIM) {
+      const scale = MAX_DIM / Math.max(w, h);
+      w = Math.round(w * scale);
+      h = Math.round(h * scale);
+    }
+    scanCanvas.width = w;
+    scanCanvas.height = h;
     const ctx = scanCanvas.getContext('2d');
-    ctx.drawImage(scanVideo, 0, 0, scanCanvas.width, scanCanvas.height);
+    ctx.drawImage(scanVideo, 0, 0, w, h);
 
     if (cameraStream) {
       cameraStream.getTracks().forEach(t => t.stop());
@@ -792,9 +823,14 @@
         : '🤔 No pude reconocer el patrón — revisá/completá a mano';
       scanEditInput.focus();
     } catch (e) {
+      // No cerramos el panel: dejamos que escriba la dirección a mano sobre la misma foto que sacó,
+      // así no pierde el paso aunque el OCR haya fallado.
       scanOcrLoading.style.display = 'none';
-      showError('Falló la lectura de la etiqueta. Probá con más luz o más cerca del texto.');
-      closeScanPanel();
+      scanResult.style.display = 'flex';
+      scanEditInput.value = '';
+      scanDetectedLabel.textContent = '⚠️ Falló la lectura automática — escribí la dirección a mano';
+      showError('Detalle técnico del error de OCR: ' + (e && e.message ? e.message : e));
+      scanEditInput.focus();
     }
   }
 
