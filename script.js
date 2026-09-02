@@ -704,7 +704,9 @@
 
   function getOcrWorker(){
     if (!ocrWorkerPromise) {
-      ocrWorkerPromise = Tesseract.createWorker('spa');
+      ocrWorkerPromise = Tesseract.createWorker('spa', 1, {
+        workerPath: 'worker.min.js'
+      });
     }
     return ocrWorkerPromise;
   }
