@@ -180,7 +180,7 @@
       li.className = 'rp-stop';
 
       const dot = document.createElement('div');
-      dot.className = 'rp-dot ' + (stop.status === 'ok' ? (stop.approx ? 'approx' : 'ok') : stop.status === 'error' ? 'err' : 'pending');
+      dot.className = 'rp-dot ' + (stop.status === 'ok' ? 'ok' : stop.status === 'error' ? 'err' : 'pending');
 
       const addrWrap = document.createElement('div');
       addrWrap.className = 'rp-stop-addr';
@@ -188,10 +188,8 @@
       rawEl.className = 'raw';
       rawEl.textContent = stop.raw;
       const statusEl = document.createElement('span');
-      statusEl.className = 'status' + (stop.status === 'error' ? ' err' : stop.approx ? ' approx' : '');
-      statusEl.textContent = stop.status === 'ok'
-        ? (stop.approx ? '≈ Ubicada aprox. (sin nro. exacto en el mapa)' : 'Ubicada')
-        : stop.status === 'error' ? 'No se pudo ubicar' : 'Buscando...';
+      statusEl.className = 'status' + (stop.status === 'error' ? ' err' : '');
+      statusEl.textContent = stop.status === 'ok' ? 'Ubicada' : stop.status === 'error' ? 'No se pudo ubicar' : 'Buscando...';
       addrWrap.appendChild(rawEl);
       addrWrap.appendChild(statusEl);
 
@@ -224,44 +222,19 @@
     });
   }
 
-  async function geocodeQuery(rawAddress){
-    const q = /argentina|buenos aires|caba|amba/i.test(rawAddress) ? rawAddress : rawAddress + ', Buenos Aires, Argentina';
-    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ar&q=' + encodeURIComponent(q);
-    const res = await fetch(url, { headers: { 'Accept-Language': 'es' } });
-    const json = await res.json();
-    if (json && json.length) {
-      return { lat: parseFloat(json[0].lat), lon: parseFloat(json[0].lon) };
-    }
-    return null;
-  }
-
   async function geocodeOne(stop){
     try {
-      const exact = await geocodeQuery(stop.raw);
-      if (exact) {
-        stop.lat = exact.lat;
-        stop.lon = exact.lon;
+      const q = /argentina|buenos aires|caba|amba/i.test(stop.raw) ? stop.raw : stop.raw + ', Buenos Aires, Argentina';
+      const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ar&q=' + encodeURIComponent(q);
+      const res = await fetch(url, { headers: { 'Accept-Language': 'es' } });
+      const json = await res.json();
+      if (json && json.length) {
+        stop.lat = parseFloat(json[0].lat);
+        stop.lon = parseFloat(json[0].lon);
         stop.status = 'ok';
-        stop.approx = false;
-        return;
+      } else {
+        stop.status = 'error';
       }
-
-      // Fallback: en el conurbano, OSM muchas veces tiene la calle cargada pero no
-      // el número de puerta exacto. Reintentamos sin el número para al menos ubicar la calle.
-      const withoutNumber = stop.raw.replace(/\b\d{1,6}\b/, '').replace(/\s{2,}/g, ' ').replace(/,\s*,/g, ',').trim();
-      if (withoutNumber && withoutNumber.toLowerCase() !== stop.raw.toLowerCase()) {
-        await new Promise(r => setTimeout(r, 1100)); // respetar límite de Nominatim entre el intento exacto y el de respaldo
-        const approx = await geocodeQuery(withoutNumber);
-        if (approx) {
-          stop.lat = approx.lat;
-          stop.lon = approx.lon;
-          stop.status = 'ok';
-          stop.approx = true;
-          return;
-        }
-      }
-
-      stop.status = 'error';
     } catch (e) {
       stop.status = 'error';
     }
