@@ -119,6 +119,7 @@
     background: #cfcabb;
   }
   .rp-dot.ok{ background: var(--pine); }
+  .rp-dot.approx{ background: var(--amber); }
   .rp-dot.pending{ background: var(--amber); animation: pulse 1s infinite; }
   .rp-dot.err{ background: var(--danger); }
   @keyframes pulse{ 50%{ opacity: .35; } }
@@ -127,6 +128,7 @@
   .rp-stop-addr .raw{ display:block; }
   .rp-stop-addr .status{ font-size: 11px; color: var(--ink-soft); }
   .rp-stop-addr .status.err{ color: var(--danger); }
+  .rp-stop-addr .status.approx{ color: #a5760f; }
 
   .rp-retry{
     display: flex;
