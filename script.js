@@ -750,7 +750,8 @@
     // suelen traer un campo explícito "Dirección:" — no depende de que la calle
     // empiece con "Av./Calle/etc.", que en la mayoría de los casos ni está.
     let streetPart = null;
-    const dirFieldMatch = text.match(/direcci[oó]n\s*:?\s*([^\n]+)/i);
+    // Toleramos que el OCR confunda la primera letra ("Pireccion" en vez de "Direccion", etc.)
+    const dirFieldMatch = text.match(/\b[a-záéíóúñ]{0,2}irecci[oó]n\s*:?\s*([^\n]+)/i);
     if (dirFieldMatch) {
       streetPart = dirFieldMatch[1].trim().replace(/\s{2,}/g, ' ');
     }
@@ -768,7 +769,7 @@
 
     // Localidad: primero el campo "Barrio:" si existe, si no, buscar por nombre conocido.
     let locality = null;
-    const barrioMatch = text.match(/barrio\s*:?\s*([^\n]+)/i);
+    const barrioMatch = text.match(/\b[a-záéíóúñ]{0,2}arrio\s*:?\s*([^\n]+)/i);
     if (barrioMatch) {
       locality = barrioMatch[1].trim();
     } else {
@@ -783,6 +784,19 @@
     }
     // No matcheó ningún patrón: devolvemos el texto crudo para que lo edite a mano
     return { found: false, address: flat.trim().slice(0, 120) };
+  }
+
+  function applyGrayscaleContrast(ctx, w, h){
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const d = imgData.data;
+    const CONTRAST = 1.5; // >1 aumenta contraste
+    for (let i = 0; i < d.length; i += 4) {
+      const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      let v = (gray - 128) * CONTRAST + 128;
+      v = Math.max(0, Math.min(255, v));
+      d[i] = d[i + 1] = d[i + 2] = v;
+    }
+    ctx.putImageData(imgData, 0, 0);
   }
 
   async function captureAndReadLabel(){
@@ -808,6 +822,7 @@
     scanCanvas.height = h;
     const ctx = scanCanvas.getContext('2d');
     ctx.drawImage(scanVideo, 0, 0, w, h);
+    applyGrayscaleContrast(ctx, w, h);
 
     if (cameraStream) {
       cameraStream.getTracks().forEach(t => t.stop());
